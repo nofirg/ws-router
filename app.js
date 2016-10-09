@@ -2,7 +2,6 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
 var when = require('when');
-//var redis = require("redis");
 var server = require('http').createServer(app);
 var io = require('socket.io')(server, {'transports': ['websocket', 'polling']});
 var amqp = require('amqplib/callback_api');
@@ -10,14 +9,16 @@ var uuid = require('node-uuid');
 var config = require('config');
 
 server.listen(config.get('port'), config.get('host'));
-//io.set("store", new io.RedisStore);
+
 
 app.use(express.static(__dirname + '/public'));
-app.use(bodyParser.json());       // to support JSON-encoded bodies
+app.use(bodyParser.json());
 app.get('/', function (req, res, next) {
     res.sendFile(__dirname + '/index.html');
 });
 var clients = {};
+var requestQueueName = config.get('request_queue_name');
+var responseQueueName = config.get('response_queues_name');
 
 var chanel;
 var calls = {};
@@ -40,8 +41,8 @@ amqpConnect = function (err, conn) {
     conn.createChannel(function (err, ch) {
         console.log("[AMQP] connected");
         chanel = ch;
-        chanel.assertQueue('callback', {exclusive: true, autoDelete: true, durable: false});
-        chanel.consume('callback', function (msg) {
+        chanel.assertQueue(responseQueueName, {exclusive: true, autoDelete: true, durable: false});
+        chanel.consume(responseQueueName, function (msg) {
             socketId = calls[msg.properties.correlationId];
             clients[socketId].emit('message', msg.content.toString());
             delete calls[msg.properties.correlationId];
@@ -71,8 +72,8 @@ io.on('connection', function (socket) {
         var corr = uuid();
         calls[corr] = socket.id;
         console.log(calls);
-        chanel.sendToQueue('http',
+        chanel.sendToQueue(requestQueueName,
             new Buffer(JSON.stringify(data)),
-            {correlationId: corr, replyTo: 'callback'});
+            {correlationId: corr, replyTo: config.get('response_queues_name')});
     });
 });

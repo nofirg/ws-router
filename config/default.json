@@ -1,5 +1,7 @@
 {
   "host": "localhost",
   "port": "9007",
-  "rabbit": "amqp://rabbitmq"
+  "rabbit": "amqp://rabbitmq",
+  "request_queue_name": "http",
+  "response_queues_name": "callback"
 }
