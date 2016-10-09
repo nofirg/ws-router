@@ -1,0 +1,20 @@
+{
+  "name": "router",
+  "version": "1.0.0",
+  "description": "description",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nofirg/ws-router"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "amqplib": "^0.4.2",
+    "body-parser": "^1.15.2",
+    "config": "^1.21.0",
+    "express": "^4.14.0",
+    "node-uuid": "^1.4.7",
+    "socket.io": "^1.4.8"
+  }
+}

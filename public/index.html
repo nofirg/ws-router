@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <style>
+        td {
+            vertical-align: top;
+            border:1px solid black;
+        }
+    </style>
+</head>
+<body>
+
+<form id="form">
+    <input type="button" value="connect" id="connect"/>
+    <input type="button" value="disconnect" id="disconnect"/>
+    <br/>
+    <select id="method">
+        <option>GET</option>
+        <option>POST</option>
+        <option>PUT</option>
+        <option>DELETE</option>
+    </select>
+    <input id="path" />
+    <input type="submit" value="Send">
+    <br/>
+    <input id="sid">
+    <br/>
+    <textarea id="body_params" rows="10" cols="50">{"phone":"79045173703","device_type":"android","device_token":"xxxxxxxxxxxxxxxxx1","password":"123456","type":"password","application":"com.targo.org","system_version":"9.3.1","application_version":"1.0.0"}</textarea>
+    <br/>
+    <textarea id="query_params" rows="10" cols="50">{}</textarea> <br/>
+
+
+</form>
+<table id="future">
+
+</table>
+<script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+
+<script>
+    var socket = io.connect('http://localhost:9007', {'transports': ['websocket', 'polling']});
+    socket.on('connect', function (data) {
+        socket.emit('join', 'Hello World from client');
+    });
+
+    socket.on('message', function (data) {
+        var response = JSON.parse(data);
+        if (response.data != undefined && response.data.sid != undefined) {
+            $('#sid').val(response.data.sid);
+        }
+        dataText = JSON.stringify(JSON.parse(data), null, 2);
+        console.log(response);
+        $('#future tr#' + response.request_id).append($('<td></td>').html('<pre>' + dataText + '</pre>'));
+    });
+
+
+    $('form').submit(function (e) {
+        e.preventDefault();
+        var body_params = JSON.parse($('#body_params').val());
+        var query_params = JSON.parse($('#query_params').val());
+        var query = $('#query').val();
+        var path = $('#path').val();
+        var method = $('#method').val();
+        var sid = $('#sid').val();
+        var requestId = ('' + Math.random()).replace('0.', '');
+        var payloadData = {
+            "sid": sid,
+            "query": path,
+            "method": method,
+            "body_params": body_params,
+            "query_params": query_params,
+            "request_id": requestId
+        };
+
+        var textPayload = JSON.stringify(payloadData, null, 2);
+
+        $('#future').prepend(
+                $('<tr/>').attr('id', requestId).append(
+                        $('<td claas="request"/>').html('<pre>' + textPayload + '</pre>')
+                ));
+
+        socket.emit('rest', payloadData);
+    });
+
+    $('#connect').click(function () {
+        console.log('click');
+        socket.emit('connect');
+    });
+    $('#disconnect').click(function () {
+        socket.disconnect();
+        socket.emit('disconnect');
+    });
+</script>
+</body>
+</html>
