@@ -44,7 +44,7 @@ amqpConnect = function (err, conn) {
         chanel.assertQueue(responseQueueName, {exclusive: true, autoDelete: true, durable: false});
         chanel.consume(responseQueueName, function (msg) {
             socketId = calls[msg.properties.correlationId];
-            clients[socketId].emit('message', msg.content.toString());
+            clients[socketId].emit('response', msg.content.toString());
             delete calls[msg.properties.correlationId];
         }, {noAck: true});
     });
@@ -67,7 +67,7 @@ io.on('connection', function (socket) {
 
     });
 
-    socket.on('rest', function (data) {
+    socket.on('request', function (data) {
         console.log(data);
         var corr = uuid();
         calls[corr] = socket.id;
