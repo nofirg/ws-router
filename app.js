@@ -76,4 +76,7 @@ io.on('connection', function (socket) {
             new Buffer(JSON.stringify(data)),
             {correlationId: corr, replyTo: config.get('response_queues_name')});
     });
+    socket.on('ping', function (data) {
+        clients[socket.id].emit('ping', data);
+    });
 });
