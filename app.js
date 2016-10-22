@@ -41,7 +41,7 @@ amqpConnect = function (err, conn) {
     conn.createChannel(function (err, ch) {
         console.log("[AMQP] connected");
         chanel = ch;
-        chanel.assertQueue(responseQueueName, {exclusive: true, autoDelete: true, durable: false});
+        chanel.assertQueue(responseQueueName, {exclusive: false, autoDelete: false, durable: true});
         chanel.consume(responseQueueName, function (msg) {
             socketId = calls[msg.properties.correlationId];
             clients[socketId].emit('response', msg.content.toString());
