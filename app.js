@@ -2,6 +2,7 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
 var when = require('when');
+var PHPUnserialize = require('php-unserialize');
 var server = require('http').createServer(app);
 var io = require('socket.io')(server, {'transports': ['websocket', 'polling']});
 var amqp = require('amqplib/callback_api');
@@ -55,6 +56,13 @@ start = function () {
 }
 
 start();
+
+io.set("authorization", function(data, accept) {
+    //var cookie = data.headers.cookie;
+    //data.cookie = cookie.parse(data.headers.cookie);
+    //accept('No cookie transmitted.', false);
+    accept(null, true);
+});
 
 io.on('connection', function (socket) {
     console.info('New client connected (id=' + socket.id + ').');
