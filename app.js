@@ -32,6 +32,22 @@ var responseQueueName = config.get('response_queues_name');
 var chanel;
 var calls = {};
 var users = {};
+var socketMap = {};
+
+
+sStore = {
+    userSocket: {},
+    socketUser: {},
+    addSocketUser: function (socketId, userId) {
+        this.socketUser[socketId] = userId;
+    },
+    addSocket: function (userId, socketId) {
+        this.userSocket[userId][socketId] = socketId;
+    }
+};
+
+
+
 
 amqpConnect = function (err, conn) {
     if (err !== null) {
@@ -66,24 +82,42 @@ start = function () {
 
 start();
 
-io.use(function(socket, next) {
-    var cookies = cookie.parse(socket.request.headers.cookie);
-    if (!cookies.sid) {
-        console.log('Cookie is absent', cookies);
+io.use(function (socket, next) {
+    if (socket.request.headers.cookie === undefined) {
         next(new Error('not authorized'));
         return;
     }
+    var cookies = cookie.parse(socket.request.headers.cookie);
+    console.log(cookies);
+    /*    if (!cookies.sid) {
+     console.log('Cookie is absent', cookies);
+     next(new Error('not authorized'));
+     return;
+     }*/
+    cookies.sid = '2l81os6eeug9isr7nc6b9be8v2';
     sid = 'PHPREDIS_SESSION:' + cookies.sid;
     redisClient.get(sid, function (err, reply) { // get entire file
-        if (err) {
+        if (err || reply == null) {
             console.log('redis get error: ', sid);
             next(new Error('not authorized'));
         } else {
             session = PHPUnserialize.unserializeSession(reply);
-            if (!session.user_id) {
+            if (!session.user_id || session.user_id == 0) {
                 next(new Error('not authorized'));
+                return;
             }
-            console.log('success auth', sid);
+            console.log('success auth', sid, reply);
+            if (!users[session.user_id]) {
+                users[session.user_id] = {};
+            }
+            console.log(session);
+            users[session.user_id][socket.id] = socket.id;
+
+            if (!socketMap[socket.id]) {
+                socketMap = [];
+            }
+            socketMap[socket.id] = session.user_id;
+            console.log(users, socketMap);
             next();
         }
     });
@@ -97,6 +131,9 @@ io.on('connection', function (socket) {
 
     socket.on('disconnect', function () {
         delete clients[socket.id];
+        userId = socketMap[socket.id];
+        delete socketMap[socket.id];
+        delete users[userId][socket.id];
         console.info('Client gone (id=' + socket.id + ').');
 
     });
