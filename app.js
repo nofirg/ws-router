@@ -8,7 +8,7 @@ var amqp = require('amqplib/callback_api');
 var uuid = require('node-uuid');
 var config = require('config');
 var redis = require("redis"),
-    redisClient = redis.createClient({host: 'dev.alol.io'});
+    redisClient = redis.createClient({host: 'redis', port: 9379});
 var cookie = require('cookie');
 
 
@@ -24,29 +24,49 @@ redisClient.on("error", function (err) {
     console.log("Error " + err);
 });
 
-
-var clients = {};
 var requestQueueName = config.get('request_queue_name');
 var responseQueueName = config.get('response_queues_name');
 
 var chanel;
-var calls = {};
-var users = {};
-var socketMap = {};
 
 
 sStore = {
-    userSocket: {},
-    socketUser: {},
+    sockets: {},
+    userSockets: {},
+    socketUsers: {},
+    requesrs: {},
     addSocketUser: function (socketId, userId) {
-        this.socketUser[socketId] = userId;
+        this.socketUsers[socketId] = userId;
     },
-    addSocket: function (userId, socketId) {
-        this.userSocket[userId][socketId] = socketId;
+    addUserSocket: function (userId, socketId) {
+        if (!this.userSockets[userId]) {
+            this.userSockets[userId] = {};
+        }
+        this.userSockets[userId][socketId] = socketId;
+    },
+    addSocket: function (socket) {
+        this.sockets[socket.id] = socket;
+    },
+    getSocket: function (socketId) {
+        return this.sockets[socketId];
+    },
+    deleteSocket:function(socketId){
+        userId = this.socketUsers[socketId];
+        delete this.socketUsers[socketId];
+        delete this.userSockets[userId][socketId];
+        delete this.sockets[socketId];
+    },
+    addRequest: function (requestId, socketId) {
+        this.requesrs[requestId] = socketId;
+        console.log('add request to socket', requestId, socketId);
+    },
+    getSocketByRequestId: function (requestId) {
+        socketId = this.requesrs[requestId];
+        delete this.requesrs[requestId];
+        return this.sockets[socketId];
+
     }
 };
-
-
 
 
 amqpConnect = function (err, conn) {
@@ -69,9 +89,7 @@ amqpConnect = function (err, conn) {
         chanel = ch;
         chanel.assertQueue(responseQueueName, {exclusive: false, autoDelete: false, durable: true});
         chanel.consume(responseQueueName, function (msg) {
-            socketId = calls[msg.properties.correlationId];
-            clients[socketId].emit('response', msg.content.toString());
-            delete calls[msg.properties.correlationId];
+            sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', msg.content.toString());
         }, {noAck: true});
     });
 };
@@ -88,13 +106,7 @@ io.use(function (socket, next) {
         return;
     }
     var cookies = cookie.parse(socket.request.headers.cookie);
-    console.log(cookies);
-    /*    if (!cookies.sid) {
-     console.log('Cookie is absent', cookies);
-     next(new Error('not authorized'));
-     return;
-     }*/
-    cookies.sid = '2l81os6eeug9isr7nc6b9be8v2';
+    cookies.sid = '1578ea2d29803e4ed9897c79ad4caf6d';
     sid = 'PHPREDIS_SESSION:' + cookies.sid;
     redisClient.get(sid, function (err, reply) { // get entire file
         if (err || reply == null) {
@@ -102,22 +114,13 @@ io.use(function (socket, next) {
             next(new Error('not authorized'));
         } else {
             session = PHPUnserialize.unserializeSession(reply);
-            if (!session.user_id || session.user_id == 0) {
+            if (!session.__id || session.__id == 0) {
                 next(new Error('not authorized'));
                 return;
             }
-            console.log('success auth', sid, reply);
-            if (!users[session.user_id]) {
-                users[session.user_id] = {};
-            }
-            console.log(session);
-            users[session.user_id][socket.id] = socket.id;
-
-            if (!socketMap[socket.id]) {
-                socketMap = [];
-            }
-            socketMap[socket.id] = session.user_id;
-            console.log(users, socketMap);
+            console.log('success auth', sid, reply, session);
+            sStore.addUserSocket(session.__id, socket.id);
+            sStore.addSocketUser(socket.id, session.__id);
             next();
         }
     });
@@ -126,28 +129,21 @@ io.use(function (socket, next) {
 
 io.on('connection', function (socket) {
     console.info('New client connected (id=' + socket.id + ').');
-    clients[socket.id] = socket;
-    socket.join('user_id');
-
+    sStore.addSocket(socket);
     socket.on('disconnect', function () {
-        delete clients[socket.id];
-        userId = socketMap[socket.id];
-        delete socketMap[socket.id];
-        delete users[userId][socket.id];
+        sStore.deleteSocket(socket.id);
         console.info('Client gone (id=' + socket.id + ').');
-
     });
 
     socket.on('request', function (data) {
         console.log(data);
         var corr = uuid();
-        calls[corr] = socket.id;
-        console.log(calls);
+        sStore.addRequest(corr, socket.id);
         chanel.sendToQueue(requestQueueName,
             new Buffer(JSON.stringify(data)),
             {correlationId: corr, replyTo: config.get('response_queues_name')});
     });
     socket.on('check', function (data) {
-        clients[socket.id].emit('check', data);
+        sStore.getSocket(socket.id).emit('check', data);
     });
 });
