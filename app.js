@@ -31,6 +31,7 @@ var responseQueueName = config.get('response_queues_name');
 
 var chanel;
 var calls = {};
+var users = {};
 
 amqpConnect = function (err, conn) {
     if (err !== null) {
@@ -65,29 +66,29 @@ start = function () {
 
 start();
 
-io.set("authorization", function (data, accept) {
-    var cookies = cookie.parse(data.headers.cookie);
+io.use(function(socket, next) {
+    var cookies = cookie.parse(socket.request.headers.cookie);
     if (!cookies.sid) {
-        console.log('Cookie is absent', cookies)
-        accept(null, false);
+        console.log('Cookie is absent', cookies);
+        next(new Error('not authorized'));
         return;
     }
     sid = 'PHPREDIS_SESSION:' + cookies.sid;
     redisClient.get(sid, function (err, reply) { // get entire file
         if (err) {
             console.log('redis get error: ', sid);
-            accept(null, false);
+            next(new Error('not authorized'));
         } else {
             session = PHPUnserialize.unserializeSession(reply);
             if (!session.user_id) {
-                accept(null, false);
+                next(new Error('not authorized'));
             }
-            accept(null, true);
+            console.log('success auth', sid);
+            next();
         }
     });
-    accept(null, false);
-
 });
+
 
 io.on('connection', function (socket) {
     console.info('New client connected (id=' + socket.id + ').');
