@@ -1,22 +1,30 @@
 var express = require('express');
 var bodyParser = require('body-parser');
 var app = express();
-var when = require('when');
 var PHPUnserialize = require('php-unserialize');
 var server = require('http').createServer(app);
 var io = require('socket.io')(server, {'transports': ['websocket', 'polling']});
 var amqp = require('amqplib/callback_api');
 var uuid = require('node-uuid');
 var config = require('config');
+var redis = require("redis"),
+    redisClient = redis.createClient({host: 'dev.alol.io'});
+var cookie = require('cookie');
+
 
 server.listen(config.get('port'), config.get('host'));
-
-
 app.use(express.static(__dirname + '/public'));
 app.use(bodyParser.json());
 app.get('/', function (req, res, next) {
     res.sendFile(__dirname + '/index.html');
 });
+
+
+redisClient.on("error", function (err) {
+    console.log("Error " + err);
+});
+
+
 var clients = {};
 var requestQueueName = config.get('request_queue_name');
 var responseQueueName = config.get('response_queues_name');
@@ -57,11 +65,28 @@ start = function () {
 
 start();
 
-io.set("authorization", function(data, accept) {
-    //var cookie = data.headers.cookie;
-    //data.cookie = cookie.parse(data.headers.cookie);
-    //accept('No cookie transmitted.', false);
-    accept(null, true);
+io.set("authorization", function (data, accept) {
+    var cookies = cookie.parse(data.headers.cookie);
+    if (!cookies.sid) {
+        console.log('Cookie is absent', cookies)
+        accept(null, false);
+        return;
+    }
+    sid = 'PHPREDIS_SESSION:' + cookies.sid;
+    redisClient.get(sid, function (err, reply) { // get entire file
+        if (err) {
+            console.log('redis get error: ', sid);
+            accept(null, false);
+        } else {
+            session = PHPUnserialize.unserializeSession(reply);
+            if (!session.user_id) {
+                accept(null, false);
+            }
+            accept(null, true);
+        }
+    });
+    accept(null, false);
+
 });
 
 io.on('connection', function (socket) {
