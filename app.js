@@ -26,6 +26,7 @@ redisClient.on("error", function (err) {
 
 var requestQueueName = config.get('request_queue_name');
 var responseQueueName = config.get('response_queues_name');
+var eventQueueName = config.get('event_queues_name');
 
 var chanel;
 
@@ -43,6 +44,12 @@ sStore = {
             this.userSockets[userId] = {};
         }
         this.userSockets[userId][socketId] = socketId;
+    },
+    findUserSocket: function (userId) {
+        if (this.userSockets[userId]) {
+            return this.userSockets[userId];
+        }
+        return {}
     },
     addSocket: function (socket) {
         this.sockets[socket.id] = socket;
@@ -91,7 +98,19 @@ amqpConnect = function (err, conn) {
         chanel.consume(responseQueueName, function (msg) {
             sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', msg.content.toString());
         }, {noAck: true});
+
+        chanel.assertQueue(eventQueueName, {exclusive: false, autoDelete: false, durable: true});
+        chanel.consume(eventQueueName, function (msg) {
+            var event = JSON.parse(msg.content.toString());
+            console.log('event', event);
+            var sockets = sStore.findUserSocket(event.user_id);
+            console.log(sockets);
+            for(var socketId in sockets) {
+                sStore.getSocket(socketId).emit('event', event);
+            }
+        }, {noAck: true});
     });
+
 };
 
 start = function () {
@@ -106,11 +125,11 @@ io.use(function (socket, next) {
         return;
     }
     var cookies = cookie.parse(socket.request.headers.cookie);
-    cookies.sid = '1578ea2d29803e4ed9897c79ad4caf6d';
+    //cookies.sid = '8bd5500183457d6ff2c8ef4c7c3e0fdf';
     sid = 'PHPREDIS_SESSION:' + cookies.sid;
     redisClient.get(sid, function (err, reply) { // get entire file
-        if (err || reply == null) {
-            console.log('redis get error: ', sid);
+        if (err || !reply) {
+            console.log('redis get error: ', cookies);
             next(new Error('not authorized'));
         } else {
             session = PHPUnserialize.unserializeSession(reply);
