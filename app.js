@@ -78,6 +78,7 @@ sStore = {
         this.socketSession[socketId] = sid;
     },
     getSocketSession: function (socketId) {
+        console.log(this.socketSession);
         return this.socketSession[socketId];
     }
 };
@@ -144,7 +145,7 @@ io.use(function (socket, next) {
                 next(new Error('not authorized'));
                 return;
             }
-            console.log('success auth', sid, reply, session);
+            console.log('success auth', sid, reply, session, cookies);
             sStore.addUserSocket(session.__id, socket.id);
             sStore.addSocketUser(socket.id, session.__id);
             sStore.addSocketSession(socket.id, cookies.sid)
@@ -167,6 +168,7 @@ io.on('connection', function (socket) {
         var corr = uuid();
         sStore.addRequest(corr, socket.id);
         data.sid = sStore.getSocketSession(socket.id);
+        console.log(data.sid);
         chanel.sendToQueue(requestQueueName,
             new Buffer(JSON.stringify(data)),
             {correlationId: corr, replyTo: config.get('response_queues_name')});
