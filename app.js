@@ -8,7 +8,7 @@ var amqp = require('amqplib/callback_api');
 var uuid = require('node-uuid');
 var config = require('config');
 var redis = require("redis"),
-    redisClient = redis.createClient({host: 'redis', port: 9379});
+    redisClient = redis.createClient({host: 'redis', port: 6379});
 var cookie = require('cookie');
 
 
