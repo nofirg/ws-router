@@ -74,7 +74,7 @@ sStore = {
         delete this.requesrs[requestId];
         return this.sockets[socketId];
     },
-    addSocketSession: function (sid, socketId) {
+    addSocketSession: function (socketId, sid) {
         this.socketSession[socketId] = sid;
     },
     getSocketSession: function (socketId) {
