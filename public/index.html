@@ -11,8 +11,9 @@
 <body>
 
 <form id="form">
-    <input type="button" value="connect" id="connect"/>
-    <input type="button" value="disconnect" id="disconnect"/>
+    <textarea id="auth_data" rows="10" cols="50">{"phone":"79045173703","device_type":"android","device_token":"xxxxxxxxxxxxxxxxx1","password":"123456","type":"password","application":"com.targo.org","system_version":"9.3.1","application_version":"1.0.0"}</textarea>
+    <br />
+    <input type="button" value="auth" id="auth"/>
     <br/>
     <select id="method">
         <option>GET</option>
@@ -38,22 +39,8 @@
 <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
 
 <script>
-    var socket = io.connect('http://localhost:9007', {'transports': ['websocket', 'polling']});
-    socket.on('connect', function (data) {
-        socket.emit('join', 'Hello World from client');
-    });
-
-    socket.on('response', function (data) {
-        var response = JSON.parse(data);
-        if (response.data != undefined && response.data.sid != undefined) {
-            $('#sid').val(response.data.sid);
-        }
-        dataText = JSON.stringify(JSON.parse(data), null, 2);
-        console.log(response);
-        $('#future tr#' + response.request_id).append($('<td></td>').html('<pre>' + dataText + '</pre>'));
-    });
-
-
+    var base_url = '';
+    var socket = {};
     $('form').submit(function (e) {
         e.preventDefault();
         var body_params = JSON.parse($('#body_params').val());
@@ -89,6 +76,38 @@
     $('#disconnect').click(function () {
         socket.disconnect();
         socket.emit('disconnect');
+    });
+
+
+
+    $.ajaxSetup({
+        crossDomain: true,
+        xhrFields: {
+            withCredentials: true
+        }
+    });
+
+
+    $('#auth').click(function () {
+        var data = $('#auth_data').val();
+        data = JSON.parse(data);
+        $.post(base_url + '/api/auth', data, function () {
+
+
+            $.get(base_url + '/api/auth');
+
+            socket = io.connect(base_url, {'transports': ['websocket', 'polling'], 'path':'/websocket'});
+
+            socket.on('response', function (data) {
+                var response = JSON.parse(data);
+                if (response.data != undefined && response.data.sid != undefined) {
+                    $('#sid').val(response.data.sid);
+                }
+                dataText = JSON.stringify(JSON.parse(data), null, 2);
+                console.log(response);
+                $('#future tr#' + response.request_id).append($('<td></td>').html('<pre>' + dataText + '</pre>'));
+            });
+        });
     });
 </script>
 </body>
