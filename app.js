@@ -36,6 +36,7 @@ sStore = {
     userSockets: {},
     socketUsers: {},
     requesrs: {},
+    socketSession: {},
     addSocketUser: function (socketId, userId) {
         this.socketUsers[socketId] = userId;
     },
@@ -57,11 +58,12 @@ sStore = {
     getSocket: function (socketId) {
         return this.sockets[socketId];
     },
-    deleteSocket:function(socketId){
+    deleteSocket: function (socketId) {
         userId = this.socketUsers[socketId];
         delete this.socketUsers[socketId];
         delete this.userSockets[userId][socketId];
         delete this.sockets[socketId];
+        delete this.socketSession[socketId];
     },
     addRequest: function (requestId, socketId) {
         this.requesrs[requestId] = socketId;
@@ -71,7 +73,12 @@ sStore = {
         socketId = this.requesrs[requestId];
         delete this.requesrs[requestId];
         return this.sockets[socketId];
-
+    },
+    addSocketSession: function (sid, socketId) {
+        this.socketSession[socketId] = sid;
+    },
+    getSocketSession: function (socketId) {
+        return this.socketSession[socketId];
     }
 };
 
@@ -105,7 +112,7 @@ amqpConnect = function (err, conn) {
             console.log('event', event);
             var sockets = sStore.findUserSocket(event.user_id);
             console.log(sockets);
-            for(var socketId in sockets) {
+            for (var socketId in sockets) {
                 sStore.getSocket(socketId).emit('event', event);
             }
         }, {noAck: true});
@@ -140,6 +147,7 @@ io.use(function (socket, next) {
             console.log('success auth', sid, reply, session);
             sStore.addUserSocket(session.__id, socket.id);
             sStore.addSocketUser(socket.id, session.__id);
+            sStore.addSocketSession(socket.id, cookies.sid)
             next();
         }
     });
@@ -158,6 +166,7 @@ io.on('connection', function (socket) {
         console.log(data);
         var corr = uuid();
         sStore.addRequest(corr, socket.id);
+        data.sid = sStore.getSocketSession(socket.id);
         chanel.sendToQueue(requestQueueName,
             new Buffer(JSON.stringify(data)),
             {correlationId: corr, replyTo: config.get('response_queues_name')});
