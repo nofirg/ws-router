@@ -129,7 +129,7 @@ start();
 
 io.use(function (socket, next) {
     if (socket.request.headers.cookie === undefined) {
-        next(new Error('not authorized'));
+        next(new Error('not authorized 1 ' + JSON.stringify(socket.request.headers)));
         socket.disconnect();
         return;
     }
@@ -139,12 +139,12 @@ io.use(function (socket, next) {
     redisClient.get(sid, function (err, reply) { // get entire file
         if (err || !reply) {
             console.log('redis get error: ', cookies);
-            next(new Error('not authorized'));
+            next(new Error('not authorized 2 ' + JSON.stringify(socket.request.headers)));
             socket.disconnect();
         } else {
             session = PHPUnserialize.unserializeSession(reply);
             if (!session.__id || session.__id == 0) {
-                next(new Error('not authorized'));
+                next(new Error('not authorized 3 ' + JSON.stringify(socket.request.headers)));
                 socket.disconnect();
                 return;
             }
