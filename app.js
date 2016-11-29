@@ -130,6 +130,7 @@ start();
 io.use(function (socket, next) {
     if (socket.request.headers.cookie === undefined) {
         next(new Error('not authorized'));
+        socket.disconnect();
         return;
     }
     var cookies = cookie.parse(socket.request.headers.cookie);
@@ -139,10 +140,12 @@ io.use(function (socket, next) {
         if (err || !reply) {
             console.log('redis get error: ', cookies);
             next(new Error('not authorized'));
+            socket.disconnect();
         } else {
             session = PHPUnserialize.unserializeSession(reply);
             if (!session.__id || session.__id == 0) {
                 next(new Error('not authorized'));
+                socket.disconnect();
                 return;
             }
             console.log('success auth', sid, reply, session, cookies);
