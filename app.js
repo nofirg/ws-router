@@ -16,7 +16,7 @@ var logger = new winston.Logger({
     level: 'debug',
     transports: [
         new (winston.transports.Console)(),
-        new (winston.transports.File)({ filename: '/app/log/websocket.log' })
+        new (winston.transports.File)({filename: '/app/log/websocket.log'})
     ]
 });
 
@@ -76,7 +76,7 @@ sStore = {
     },
     addRequest: function (requestId, socketId) {
         this.requesrs[requestId] = socketId;
-        console.log('add request to socket', requestId, socketId);
+        logger.log('debug', 'add request to socket ' + requestId + ' to ' + socketId);
     },
     getSocketByRequestId: function (requestId) {
         socketId = this.requesrs[requestId];
@@ -87,7 +87,6 @@ sStore = {
         this.socketSession[socketId] = sid;
     },
     getSocketSession: function (socketId) {
-        console.log(this.socketSession);
         return this.socketSession[socketId];
     }
 };
@@ -101,7 +100,7 @@ amqpConnect = function (err, conn) {
 
     conn.on("error", function (err) {
         if (err.message !== "Connection closing") {
-            logger.log('error', "[AMQP] Conn error", err.message);
+            logger.log('error', "[AMQP] Conn error" + err.message);
         }
     });
     conn.on("close", function () {
@@ -146,7 +145,7 @@ io.use(function (socket, next) {
     sid = 'PHPREDIS_SESSION:' + cookies.sid;
     redisClient.get(sid, function (err, reply) { // get entire file
         if (err || !reply) {
-            logger.log('error', 'redis get error: ', cookies);
+            logger.log('error', 'redis get error: ' + cookies.sid);
             next(new Error('not authorized 2 ' + JSON.stringify(socket.request.headers)));
             socket.disconnect();
         } else {
@@ -156,7 +155,7 @@ io.use(function (socket, next) {
                 socket.disconnect();
                 return;
             }
-            logger.log('info', 'success auth ' + sid + ' '  + reply);
+            logger.log('info', 'success auth ' + sid + ' ' + reply);
             sStore.addUserSocket(session.__id, socket.id);
             sStore.addSocketUser(socket.id, session.__id);
             sStore.addSocketSession(socket.id, cookies.sid)
@@ -175,7 +174,7 @@ io.on('connection', function (socket) {
     });
 
     socket.on('request', function (data) {
-        logger.log('debug', JSON.stringify(data));
+        logger.log('debug', '[REQUEST] ' + JSON.stringify(data));
         var corr = uuid();
         sStore.addRequest(corr, socket.id);
         data.sid = sStore.getSocketSession(socket.id);
