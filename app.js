@@ -13,7 +13,7 @@ var cookie = require('cookie');
 
 var winston = require('winston');
 var logger = new winston.Logger({
-    level: 'debug',
+    level: config.get('logger_level'),
     transports: [
         new (winston.transports.Console)(),
         new (winston.transports.File)({filename: '/app/log/websocket.log'})
@@ -112,7 +112,9 @@ amqpConnect = function (err, conn) {
         chanel = ch;
         chanel.assertQueue(responseQueueName, {exclusive: false, autoDelete: false, durable: true});
         chanel.consume(responseQueueName, function (msg) {
-            sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', msg.content.toString());
+            response = msg.content.toString();
+            sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', response);
+            logger.log('debug', '[RESPONSE] ' + response);
         }, {noAck: true});
 
         chanel.assertQueue(eventQueueName, {exclusive: false, autoDelete: false, durable: true});
