@@ -1,6 +1,6 @@
 {
   "logger_level":"debug",
-  "host": "localhost",
+  "host": "127.0.0.1",
   "port": "9007",
   "rabbit": "amqp://rabbitmq",
   "request_queue_name": "http",
