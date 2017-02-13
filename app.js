@@ -16,7 +16,7 @@ var logger = new winston.Logger({
     level: config.get('logger_level'),
     transports: [
         new (winston.transports.Console)(),
-        new (winston.transports.File)({filename: '/app/log/websocket.log'})
+        new (winston.transports.File)({filename: config.get('logger_file')})
     ]
 });
 
