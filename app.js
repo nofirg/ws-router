@@ -46,6 +46,7 @@ sStore = {
     socketUsers: {},
     requesrs: {},
     socketSession: {},
+    sessionSocket: {},
     addSocketUser: function (socketId, userId) {
         this.socketUsers[socketId] = userId;
     },
@@ -72,6 +73,7 @@ sStore = {
         delete this.socketUsers[socketId];
         delete this.userSockets[userId][socketId];
         delete this.sockets[socketId];
+        delete this.sessionSocket[this.socketSession[socketId]];
         delete this.socketSession[socketId];
     },
     addRequest: function (requestId, socketId) {
@@ -85,9 +87,13 @@ sStore = {
     },
     addSocketSession: function (socketId, sid) {
         this.socketSession[socketId] = sid;
+        this.sessionSocket[sid] = socketId;
     },
     getSocketSession: function (socketId) {
         return this.socketSession[socketId];
+    },
+    getSessionSocket: function (sid) {
+        return this.sessionSocket[sid];
     }
 };
 
@@ -121,9 +127,19 @@ amqpConnect = function (err, conn) {
         chanel.consume(eventQueueName, function (msg) {
             var event = JSON.parse(msg.content.toString());
             logger.log('debug', 'event' + event);
-            var sockets = sStore.findUserSocket(event.user_id);
-            for (var socketId in sockets) {
-                sStore.getSocket(socketId).emit('event', event);
+            if (event.type == 'session_close') {
+                var socketId = sStore.getSessionSocket(event.data.sid);
+                var socket = sStore.getSocket(socketId);
+                socket.emit('event', event);
+                socket.disconnect('session has been closed');
+                sStore.deleteSocket(socketId)
+                logger.log('info', 'Client gone (id=' + socket.id + ').');
+            }
+            else {
+                var sockets = sStore.findUserSocket(event.user_id);
+                for (var socketId in sockets) {
+                    sStore.getSocket(socketId).emit('event', event);
+                }
             }
         }, {noAck: true});
     });
