@@ -34,7 +34,7 @@ redisClient.on("error", function (err) {
 });
 
 var requestQueueName = config.get('request_queue_name');
-var responseQueueName = config.get('response_queues_name');
+var responseQueueName = null;
 var eventQueueName = config.get('event_queues_name');
 
 var chanel;
@@ -113,35 +113,48 @@ amqpConnect = function (err, conn) {
         logger.log('error', "[AMQP] reconnecting");
         return setTimeout(start, 1000);
     });
+
+    conn.createChannel(function (err, ch) {
+        logger.log('info', "[AMQP] connected");
+        ch.assertExchange(eventQueueName, 'fanout', {durable: false});
+        ch.assertQueue('', {exclusive: true}, function(err, q){
+            ch.bindQueue(q.queue, eventQueueName, '');
+            ch.consume(q.queue, function (msg) {
+                var event = JSON.parse(msg.content.toString());
+                logger.log('debug', 'event' + event);
+                if (event.type == 'session_close') {
+                    var socketId = sStore.getSessionSocket(event.data.sid);
+                    if (!socketId) {
+                        return;
+                    }
+                    var socket = sStore.getSocket(socketId);
+                    socket.emit('event', event);
+                    socket.disconnect('session has been closed');
+                    sStore.deleteSocket(socketId)
+                    logger.log('info', 'Client gone (id=' + socket.id + ').');
+                }
+                else {
+                    var sockets = sStore.findUserSocket(event.user_id);
+                    for (var socketId in sockets) {
+                        sStore.getSocket(socketId).emit('event', event);
+                    }
+                }
+            }, {noAck: true});
+        });
+    });
+
     conn.createChannel(function (err, ch) {
         logger.log('info', "[AMQP] connected");
         chanel = ch;
-        chanel.assertQueue(responseQueueName, {exclusive: false, autoDelete: false, durable: true});
-        chanel.consume(responseQueueName, function (msg) {
-            response = msg.content.toString();
-            sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', response);
-            logger.log('debug', '[RESPONSE] ' + response);
-        }, {noAck: true});
+        ch.assertQueue('', {exclusive: true}, function(err, q) {
+            responseQueueName = q.queue;
+            chanel.consume(q.queue, function (msg) {
+                response = msg.content.toString();
+                sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', response);
+                logger.log('debug', '[RESPONSE] ' + response);
+            }, {noAck: true});
+        });
 
-        chanel.assertQueue(eventQueueName, {exclusive: false, autoDelete: false, durable: true});
-        chanel.consume(eventQueueName, function (msg) {
-            var event = JSON.parse(msg.content.toString());
-            logger.log('debug', 'event' + event);
-            if (event.type == 'session_close') {
-                var socketId = sStore.getSessionSocket(event.data.sid);
-                var socket = sStore.getSocket(socketId);
-                socket.emit('event', event);
-                socket.disconnect('session has been closed');
-                sStore.deleteSocket(socketId)
-                logger.log('info', 'Client gone (id=' + socket.id + ').');
-            }
-            else {
-                var sockets = sStore.findUserSocket(event.user_id);
-                for (var socketId in sockets) {
-                    sStore.getSocket(socketId).emit('event', event);
-                }
-            }
-        }, {noAck: true});
     });
 
 };
@@ -198,7 +211,7 @@ io.on('connection', function (socket) {
         data.sid = sStore.getSocketSession(socket.id);
         chanel.sendToQueue(requestQueueName,
             new Buffer(JSON.stringify(data)),
-            {correlationId: corr, replyTo: config.get('response_queues_name')});
+            {correlationId: corr, replyTo: responseQueueName});
     });
     socket.on('check', function (data) {
         sStore.getSocket(socket.id).emit('check', data);

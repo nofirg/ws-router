@@ -4,7 +4,6 @@
   "port": "9007",
   "rabbit": "amqp://rabbitmq",
   "request_queue_name": "http",
-  "response_queues_name": "callback",
   "event_queues_name": "event",
   "redis_host": "redis",
   "redis_port": "6379",
