@@ -1,11 +1,12 @@
 {
   "logger_level":"debug",
-  "host": "127.0.0.1",
-  "port": "9007",
+  "host": "0.0.0.0",
+  "port": "80",
   "rabbit": "amqp://rabbitmq",
-  "request_queue_name": "http",
+  "request_queue_name": "request",
+  "response_queues_name": "callback",
   "event_queues_name": "event",
   "redis_host": "redis",
   "redis_port": "6379",
-  "logger_file": "/app/log/websocket.log"
+  "logger_file": "/dev/stdout"
 }
