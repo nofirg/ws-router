@@ -18,7 +18,7 @@ var logger = new winston.Logger({
 });
 
 if (config.get('logger_file')) {
-    logger.add(winston.transports.File,{filename: config.get('logger_file')});
+    logger.add(winston.transports.File, {filename: config.get('logger_file')});
 }
 if (config.get('logger_console')) {
     logger.add(winston.transports.Console);
@@ -29,12 +29,12 @@ if (config.get('logger_graylog')) {
         level: 'debug',
         silent: false,
         handleExceptions: false,
-        prelog: function(msg) {
+        prelog: function (msg) {
             return msg.trim();
         },
         graylog: {
             servers: [{host: 'graylog', port: 12201}],
-            hostname: 'myServer',
+            hostname: 'websocket-router',
             facility: 'websocket',
             bufferSize: 1400
         },
@@ -51,7 +51,7 @@ app.get('/', function (req, res, next) {
 
 
 redisClient.on("error", function (err) {
-    logger.log('error', "[redis] " + err);
+    logger.log('error', "[redis] ", err);
 });
 
 var requestQueueName = config.get('request_queue_name');
@@ -99,7 +99,7 @@ sStore = {
     },
     addRequest: function (requestId, socketId) {
         this.requesrs[requestId] = socketId;
-        logger.log('debug', 'add request to socket ' + requestId + ' to ' + socketId);
+        logger.log('debug', 'add request to socket ', {request: requestId, socket: socketId});
     },
     getSocketByRequestId: function (requestId) {
         socketId = this.requesrs[requestId];
@@ -121,13 +121,13 @@ sStore = {
 
 amqpConnect = function (err, conn) {
     if (err !== null) {
-        logger.log('error', "[AMQP] " + err.message);
+        logger.log('error', "[AMQP] " + err.message, err);
         return setTimeout(start, 1000);
     }
 
     conn.on("error", function (err) {
         if (err.message !== "Connection closing") {
-            logger.log('error', "[AMQP] Conn error" + err.message);
+            logger.log('error', "[AMQP] Conn error" + err.message, err);
         }
     });
     conn.on("close", function () {
@@ -138,11 +138,11 @@ amqpConnect = function (err, conn) {
     conn.createChannel(function (err, ch) {
         logger.log('info', "[AMQP] connected");
         ch.assertExchange(eventQueueName, 'fanout', {durable: false});
-        ch.assertQueue('', {exclusive: true}, function(err, q){
+        ch.assertQueue('', {exclusive: true}, function (err, q) {
             ch.bindQueue(q.queue, eventQueueName, '');
             ch.consume(q.queue, function (msg) {
                 var event = JSON.parse(msg.content.toString());
-                logger.log('debug', 'event' + event);
+                logger.log('debug', 'event', event);
                 if (event.type == 'session_close') {
                     var socketId = sStore.getSessionSocket(event.data.sid);
                     if (!socketId) {
@@ -151,7 +151,7 @@ amqpConnect = function (err, conn) {
                     var socket = sStore.getSocket(socketId);
                     socket.emit('event', event);
                     socket.disconnect('session has been closed');
-                    sStore.deleteSocket(socketId)
+                    sStore.deleteSocket(socketId);
                     logger.log('info', 'Client gone (id=' + socket.id + ').');
                 }
                 else {
@@ -167,12 +167,12 @@ amqpConnect = function (err, conn) {
     conn.createChannel(function (err, ch) {
         logger.log('info', "[AMQP] connected");
         chanel = ch;
-        ch.assertQueue('', {exclusive: true}, function(err, q) {
+        ch.assertQueue('', {exclusive: true}, function (err, q) {
             responseQueueName = q.queue;
             chanel.consume(q.queue, function (msg) {
                 response = msg.content.toString();
                 sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', response);
-                logger.log('debug', '[RESPONSE] ' + response);
+                logger.log('debug', 'response', JSON.parse(response));
             }, {noAck: true});
         });
 
@@ -226,7 +226,7 @@ io.on('connection', function (socket) {
     });
 
     socket.on('request', function (data) {
-        logger.log('debug', '[REQUEST] ' + JSON.stringify(data));
+        logger.log('debug', 'request', data);
         var corr = uuid();
         sStore.addRequest(corr, socket.id);
         data.sid = sStore.getSocketSession(socket.id);
