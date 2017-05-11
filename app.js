@@ -14,12 +14,33 @@ var cookie = require('cookie');
 var winston = require('winston');
 var logger = new winston.Logger({
     level: config.get('logger_level'),
-    transports: [
-        new (winston.transports.Console)(),
-        new (winston.transports.File)({filename: config.get('logger_file')})
-    ]
+    transports: []
 });
 
+if (config.get('logger_file')) {
+    logger.add(winston.transports.File,{filename: config.get('logger_file')});
+}
+if (config.get('logger_console')) {
+    logger.add(winston.transports.Console);
+}
+if (config.get('logger_graylog')) {
+    logger.add(require('winston-graylog2'), {
+        name: 'Graylog',
+        level: 'debug',
+        silent: false,
+        handleExceptions: false,
+        prelog: function(msg) {
+            return msg.trim();
+        },
+        graylog: {
+            servers: [{host: 'graylog', port: 12201}],
+            hostname: 'myServer',
+            facility: 'websocket',
+            bufferSize: 1400
+        },
+        staticMeta: {env: 'websocket'}
+    });
+}
 
 server.listen(config.get('port'), config.get('host'));
 app.use(express.static(__dirname + '/public'));
