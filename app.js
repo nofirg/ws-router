@@ -172,7 +172,8 @@ amqpConnect = function (err, conn) {
             chanel.consume(q.queue, function (msg) {
                 response = msg.content.toString();
                 sStore.getSocketByRequestId(msg.properties.correlationId).emit('response', response);
-                logger.log('debug', 'response', JSON.parse(response));
+                logger.log('debug', 'response', {"response":response.substr(0, 500) + ' ... ' + response.substr(-500)});
+                //logger.log('debug', 'response', JSON.parse(response));
             }, {noAck: true});
         });
 
