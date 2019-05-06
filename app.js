@@ -3,9 +3,9 @@ var bodyParser = require('body-parser');
 var app = express();
 var PHPUnserialize = require('php-unserialize');
 var server = require('http').createServer(app);
-var io = require('socket.io')(server, {'transports': ['websocket']});
+var io = require('socket.io')(server);
 var amqp = require('amqplib/callback_api');
-var uuid = require('node-uuid');
+var uuidv1 = require('uuid/v1');
 var config = require('config');
 var redis = require("redis"),
     redisClient = redis.createClient({host: config.get('redis_host'), port: config.get('redis_port')});
@@ -206,7 +206,7 @@ io.on('connection', function (socket) {
 
     socket.on('request', function (data) {
         logger.log('debug', '[REQUEST] ' + JSON.stringify(data));
-        var corr = uuid();
+        var corr = uuidv1();
         sStore.addRequest(corr, socket.id);
         data.sid = sStore.getSocketSession(socket.id);
         chanel.sendToQueue(requestQueueName,
